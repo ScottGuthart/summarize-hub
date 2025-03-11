@@ -55,7 +55,7 @@ Key benefits of this approach:
 1. Click "Download Template" to get the article template
 2. Fill in your articles in the template
 3. Click "Load File" to upload your filled template
-4. Click "Summarize Articles" to process all articles
+4. Click "Process Articles" to process all articles
 5. Export the results using "Export XLSX" or "Export CSV"
 
 ## Limitations

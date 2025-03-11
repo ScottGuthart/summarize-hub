@@ -20,8 +20,8 @@ export function ArticleGrid() {
 
     const createTemplateData = useCallback((): ArticleRow[] => {
         return [{
-            "Article Content": "Paste your article text here...",
-            "Author Name": "Enter author name",
+            "Article Content": "",
+            "Author Name": "",
             "Likes": 0,
             "Shares": 0,
             "Views": 0,
@@ -103,6 +103,12 @@ export function ArticleGrid() {
         const isCSV = file.name.toLowerCase().endsWith('.csv');
 
         try {
+            // Clear the current grid data
+            if (gridRef.current) {
+                gridRef.current.data = [];
+                gridRef.current.draw();
+            }
+
             const data = await file.arrayBuffer();
             let jsonData;
 
@@ -129,6 +135,8 @@ export function ArticleGrid() {
 
             if (jsonData.length === 0) {
                 showStatus('The uploaded file appears to be empty.', true);
+                // Reset to template data if file is empty
+                await initializeGrid(createTemplateData());
                 return;
             }
 
@@ -140,6 +148,8 @@ export function ArticleGrid() {
 
             if (!hasArticleContent) {
                 showStatus('The "Article Content" column is required. Please use the template.', true);
+                // Reset to template data if validation fails
+                await initializeGrid(createTemplateData());
                 return;
             }
 
@@ -185,8 +195,13 @@ export function ArticleGrid() {
         } catch (error) {
             console.error('Error parsing file:', error);
             showStatus(`Error parsing file: ${error instanceof Error ? error.message : 'Unknown error'}`, true);
+            // Reset to template data on error
+            await initializeGrid(createTemplateData());
         }
-    }, [showStatus, initializeGrid, setCurrentFileName]);
+
+        // Reset the file input to allow selecting the same file again
+        event.target.value = '';
+    }, [showStatus, initializeGrid, setCurrentFileName, createTemplateData]);
 
     const downloadTemplate = useCallback(() => {
         const template = createTemplateData();
@@ -221,104 +236,134 @@ export function ArticleGrid() {
     }, [initializeGrid, createTemplateData, isGridInitialized]);
 
     return (
-        <div className="p-4">
-            <div className="mb-4 flex gap-4">
-                <input
-                    type="file"
-                    id="fileInput"
-                    accept=".xlsx,.csv"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                />
-                <label
-                    htmlFor="fileInput"
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded cursor-pointer"
-                >
-                    Load File
-                </label>
-                <button
-                    onClick={() => downloadTemplate()}
-                    className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"
-                >
-                    Download Template
-                </button>
-                <button
-                    onClick={async () => {
-                        if (!gridRef.current?.data?.length) {
-                            showStatus('No articles to summarize', true);
-                            return;
-                        }
+        <>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                {/* Header */}
+                <div className="border-b border-gray-200">
+                    <div className="px-6 py-5">
+                        <h2 className="text-xl font-semibold text-gray-800">Article Manager</h2>
+                        <p className="text-sm text-gray-500 mt-1">Upload, edit, and process your articles</p>
+                    </div>
 
-                        try {
-                            setIsSummarizing(true);
-                            const data = [...gridRef.current.data];
+                    {/* Action Bar */}
+                    <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center gap-x-6 gap-y-3">
+                        {/* Left side - File Actions */}
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="file"
+                                id="fileInput"
+                                accept=".xlsx,.csv"
+                                onChange={handleFileSelect}
+                                className="hidden"
+                            />
+                            <label
+                                htmlFor="fileInput"
+                                className="bg-white text-gray-700 hover:text-gray-900 hover:bg-gray-50 px-4 py-2 rounded-md border border-gray-300 flex items-center gap-2 transition-all cursor-pointer text-sm font-medium"
+                            >
+                                <span>📁</span> Choose File
+                            </label>
+                            <button
+                                onClick={() => downloadTemplate()}
+                                className="text-gray-600 hover:text-gray-800 px-3 py-2 rounded-md text-sm font-medium flex items-center gap-2 hover:bg-gray-100 transition-all"
+                            >
+                                <span>📋</span> Get Template
+                            </button>
+                        </div>
 
-                            for (let i = 0; i < data.length; i++) {
-                                const row = data[i];
-                                if (!row['Article Content']) continue;
-
-                                const { summary, tags } = await summarizeArticle(
-                                    row['Article Content'],
-                                    {
-                                        onLoadingUpdate: (status) => {
-                                            if (status.state === 'loading') {
-                                                showStatus(`Loading model: ${status.message} (${Math.round(status.progress || 0)}%)`, false, true);
-                                            } else if (status.state === 'ready') {
-                                                showStatus('Model ready, starting summarization...', false, true);
-                                            } else if (status.state === 'error') {
-                                                showStatus(status.message, true, false);
-                                            }
-                                        },
-                                        onSummarizationProgress: (current, total) => {
-                                            showStatus(`Summarizing article ${i + 1} of ${data.length}...`, false, true);
-                                        }
+                        {/* Right side - Processing Actions */}
+                        <div className="flex items-center gap-3 ml-auto">
+                            <button
+                                onClick={async () => {
+                                    if (!gridRef.current?.data?.length) {
+                                        showStatus('No articles to summarize', true);
+                                        return;
                                     }
-                                );
 
-                                data[i] = {
-                                    ...row,
-                                    Summary: summary,
-                                    Tags: tags
-                                };
+                                    try {
+                                        setIsSummarizing(true);
+                                        const data = [...gridRef.current.data];
 
-                                if (gridRef.current) {
-                                    gridRef.current.data = data;
-                                    gridRef.current.draw();
-                                }
-                            }
+                                        for (let i = 0; i < data.length; i++) {
+                                            const row = data[i];
+                                            if (!row['Article Content']) continue;
 
-                            showStatus('Summarization complete!', false, false);
-                        } catch (error) {
-                            console.error('Error during summarization:', error);
-                            showStatus('Failed to summarize articles. Please try again.', true, false);
-                        } finally {
-                            setIsSummarizing(false);
-                        }
-                    }}
-                    className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded"
-                    disabled={isSummarizing}
-                >
-                    {isSummarizing ? 'Summarizing...' : 'Summarize Articles'}
-                </button>
-                <button
-                    onClick={() => exportFile('xlsx')}
-                    className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded"
-                >
-                    Export XLSX
-                </button>
-                <button
-                    onClick={() => exportFile('csv')}
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded"
-                >
-                    Export CSV
-                </button>
+                                            const { summary, tags } = await summarizeArticle(
+                                                row['Article Content'],
+                                                {
+                                                    onLoadingUpdate: (status) => {
+                                                        if (status.state === 'loading') {
+                                                            showStatus(`Loading model: ${status.message} (${Math.round(status.progress || 0)}%)`, false, true);
+                                                        } else if (status.state === 'ready') {
+                                                            showStatus('Model ready, starting summarization...', false, true);
+                                                        } else if (status.state === 'error') {
+                                                            showStatus(status.message, true, false);
+                                                        }
+                                                    },
+                                                    onSummarizationProgress: (current, total) => {
+                                                        showStatus(`Summarizing article ${i + 1} of ${data.length}...`, false, true);
+                                                    }
+                                                }
+                                            );
+
+                                            data[i] = {
+                                                ...row,
+                                                Summary: summary,
+                                                Tags: tags
+                                            };
+
+                                            if (gridRef.current) {
+                                                gridRef.current.data = data;
+                                                gridRef.current.draw();
+                                            }
+                                        }
+
+                                        showStatus('Summarization complete!', false, false);
+                                    } catch (error) {
+                                        console.error('Error during summarization:', error);
+                                        showStatus('Failed to summarize articles. Please try again.', true, false);
+                                    } finally {
+                                        setIsSummarizing(false);
+                                    }
+                                }}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
+                                disabled={isSummarizing}
+                            >
+                                <span>🤖</span> {isSummarizing ? 'Processing...' : 'Process Articles'}
+                            </button>
+
+                            <div className="flex items-center gap-2 border-l border-gray-300 pl-3">
+                                <span className="text-sm text-gray-500">Export as:</span>
+                                <button
+                                    onClick={() => exportFile('xlsx')}
+                                    className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md hover:bg-gray-100 transition-all inline-flex items-center gap-2 text-sm"
+                                    title="Export as Excel Spreadsheet"
+                                >
+                                    <span>📊</span>
+                                    <span className="font-medium">Excel</span>
+                                </button>
+                                <button
+                                    onClick={() => exportFile('csv')}
+                                    className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md hover:bg-gray-100 transition-all inline-flex items-center gap-2 text-sm"
+                                    title="Export as CSV File"
+                                >
+                                    <span>📄</span>
+                                    <span className="font-medium">CSV</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Grid */}
+                <div className="p-6">
+                    <div
+                        ref={gridContainerRef}
+                        className="w-full h-[500px] border border-gray-200 rounded-md overflow-hidden"
+                    />
+                </div>
             </div>
 
-            <div
-                ref={gridContainerRef}
-                className="w-full h-[500px] border border-gray-200 rounded"
-            />
-
+            {/* Status Message - Now rendered outside the main container */}
             {status && (
                 <StatusMessage
                     message={status.message}
@@ -326,6 +371,6 @@ export function ArticleGrid() {
                     persistent={status.persistent}
                 />
             )}
-        </div>
+        </>
     );
 } 

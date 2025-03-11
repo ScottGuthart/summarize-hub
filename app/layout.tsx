@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -6,6 +6,10 @@ const inter = Inter({
   subsets: ['latin'],
   display: 'swap',
 });
+
+export const viewport: Viewport = {
+  themeColor: '#6D28D9',
+};
 
 export const metadata: Metadata = {
   title: 'SummarizeHub - AI Article Summarization',
@@ -45,7 +49,6 @@ export const metadata: Metadata = {
       color: '#6D28D9',
     },
   },
-  themeColor: '#6D28D9',
   manifest: '/manifest.json',
 };
 
