@@ -6,6 +6,15 @@ import type { ArticleRow } from '@/lib/types';
 import { StatusMessage } from './StatusMessage';
 import * as XLSX from 'xlsx';
 import { summarizeArticle } from '@/lib/summarize';
+import {
+    DocumentArrowDownIcon,
+    DocumentPlusIcon,
+    CommandLineIcon,
+    TableCellsIcon,
+    DocumentTextIcon,
+    ArrowUpTrayIcon,
+    ChartBarIcon
+} from '@heroicons/react/24/outline';
 
 // Type declaration for canvas-datagrid
 type CanvasDataGrid = any; // Using any for now since the library's types are not properly exported
@@ -17,6 +26,7 @@ export function ArticleGrid() {
     const [currentFileName, setCurrentFileName] = useState('articles');
     const [isGridInitialized, setIsGridInitialized] = useState(false);
     const [isSummarizing, setIsSummarizing] = useState(false);
+    const [isProcessed, setIsProcessed] = useState(false);
 
     const createTemplateData = useCallback((): ArticleRow[] => {
         return [{
@@ -52,38 +62,22 @@ export function ArticleGrid() {
                 data,
                 allowColumnReordering: true,
                 allowRowReordering: false,
-                editable: true,
+                editable: false,
                 allowColumnResizeFromCell: true,
-                allowRowResizeFromCell: true,
+                allowRowResizeFromCell: false,
                 allowSorting: true,
                 style: {
                     cellPaddingLeft: 8,
-                    cellPaddingRight: 8
+                    cellPaddingRight: 8,
+                    columnHeaderBackgroundColor: '#f8fafc',
+                    columnHeaderColor: '#1e3a8a',
+                    cellColor: '#374151', // Default text color
+                    fontFamily: 'system-ui, -apple-system, sans-serif'
                 }
             });
 
             gridRef.current.style.height = '500px';
             gridRef.current.style.width = '100%';
-
-            // Event listeners
-            gridRef.current.addEventListener('rendercell', (e: any) => {
-                if (e.cell.header.name === 'Summary' || e.cell.header.name === 'Tags') {
-                    e.ctx.fillStyle = '#888';
-                }
-            });
-
-            gridRef.current.addEventListener('keydown', (e: any) => {
-                if (e.key === 'Enter' && e.cell.rowIndex === gridRef.current.data.length - 1) {
-                    const newRow = Object.fromEntries(
-                        TEMPLATE_COLUMNS.map(col => [
-                            col,
-                            NUMERIC_COLUMNS.includes(col as any) ? 0 : ''
-                        ])
-                    ) as ArticleRow;
-                    gridRef.current.data.push(newRow);
-                    gridRef.current.selectCell(0, gridRef.current.data.length - 1);
-                }
-            });
 
             setIsGridInitialized(true);
         } catch (error) {
@@ -99,6 +93,8 @@ export function ArticleGrid() {
             return;
         }
 
+        setStatus(null); // Clear any existing status messages
+        setIsProcessed(false); // Reset processed state when new file is uploaded
         setCurrentFileName(file.name.split('.')[0]);
         const isCSV = file.name.toLowerCase().endsWith('.csv');
 
@@ -260,13 +256,15 @@ export function ArticleGrid() {
                                 htmlFor="fileInput"
                                 className="bg-white text-gray-700 hover:text-gray-900 hover:bg-gray-50 px-4 py-2 rounded-md border border-gray-300 flex items-center gap-2 transition-all cursor-pointer text-sm font-medium"
                             >
-                                <span>📁</span> Choose File
+                                <DocumentPlusIcon className="w-5 h-5" />
+                                Choose File
                             </label>
                             <button
                                 onClick={() => downloadTemplate()}
                                 className="text-gray-600 hover:text-gray-800 px-3 py-2 rounded-md text-sm font-medium flex items-center gap-2 hover:bg-gray-100 transition-all"
                             >
-                                <span>📋</span> Get Template
+                                <DocumentArrowDownIcon className="w-5 h-5" />
+                                Get Template
                             </button>
                         </div>
 
@@ -318,6 +316,7 @@ export function ArticleGrid() {
                                         }
 
                                         showStatus('Summarization complete!', false, false);
+                                        setIsProcessed(true); // Set processed state to true after successful processing
                                     } catch (error) {
                                         console.error('Error during summarization:', error);
                                         showStatus('Failed to summarize articles. Please try again.', true, false);
@@ -326,9 +325,10 @@ export function ArticleGrid() {
                                     }
                                 }}
                                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
-                                disabled={isSummarizing}
+                                disabled={isSummarizing || isProcessed}
                             >
-                                <span>🤖</span> {isSummarizing ? 'Processing...' : 'Process Articles'}
+                                <CommandLineIcon className="w-5 h-5" />
+                                {isSummarizing ? 'Processing...' : isProcessed ? 'Processing Complete' : 'Process Articles'}
                             </button>
 
                             <div className="flex items-center gap-2 border-l border-gray-300 pl-3">
@@ -338,7 +338,7 @@ export function ArticleGrid() {
                                     className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md hover:bg-gray-100 transition-all inline-flex items-center gap-2 text-sm"
                                     title="Export as Excel Spreadsheet"
                                 >
-                                    <span>📊</span>
+                                    <TableCellsIcon className="w-5 h-5" />
                                     <span className="font-medium">Excel</span>
                                 </button>
                                 <button
@@ -346,7 +346,7 @@ export function ArticleGrid() {
                                     className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md hover:bg-gray-100 transition-all inline-flex items-center gap-2 text-sm"
                                     title="Export as CSV File"
                                 >
-                                    <span>📄</span>
+                                    <DocumentTextIcon className="w-5 h-5" />
                                     <span className="font-medium">CSV</span>
                                 </button>
                             </div>
@@ -369,6 +369,9 @@ export function ArticleGrid() {
                     message={status.message}
                     isError={status.isError}
                     persistent={status.persistent}
+                    showProgress={status.message.includes('Loading model') ||
+                        status.message.includes('Summarizing article') ||
+                        status.message.includes('Model ready')}
                 />
             )}
         </>

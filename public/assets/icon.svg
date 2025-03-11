@@ -1,24 +1,30 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
     <!-- Background -->
-    <rect width="512" height="512" rx="128" fill="#6D28D9"/>
+    <rect width="512" height="512" rx="128" fill="#1e40af"/>
     
     <!-- Document Stack -->
     <g transform="translate(96, 96)">
         <!-- Back Document -->
-        <rect x="32" y="32" width="256" height="320" rx="16" fill="#F3F4F6" opacity="0.6"/>
+        <rect x="32" y="32" width="256" height="320" rx="16" fill="#bfdbfe" opacity="0.6"/>
         <!-- Middle Document -->
-        <rect x="48" y="16" width="256" height="320" rx="16" fill="#F3F4F6" opacity="0.8"/>
+        <rect x="64" y="64" width="256" height="320" rx="16" fill="#93c5fd" opacity="0.8"/>
         <!-- Front Document -->
-        <rect x="64" y="0" width="256" height="320" rx="16" fill="#F3F4F6"/>
+        <rect x="96" y="96" width="256" height="320" rx="16" fill="#dbeafe"/>
         
-        <!-- Summary Lines -->
-        <rect x="96" y="64" width="192" height="12" rx="6" fill="#6D28D9" opacity="0.8"/>
-        <rect x="96" y="96" width="160" height="12" rx="6" fill="#6D28D9" opacity="0.6"/>
-        <rect x="96" y="128" width="176" height="12" rx="6" fill="#6D28D9" opacity="0.7"/>
-        
-        <!-- AI Processing Indicator -->
-        <circle cx="288" cy="240" r="32" fill="#6D28D9"/>
-        <path d="M276 240l8 8l20-20" stroke="#F3F4F6" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Text Lines -->
+        <g transform="translate(128, 144)">
+            <!-- Summary Line -->
+            <rect x="0" y="0" width="160" height="12" rx="6" fill="#1e40af" opacity="0.8"/>
+            <rect x="0" y="32" width="192" height="12" rx="6" fill="#1e40af" opacity="0.6"/>
+            <rect x="0" y="64" width="144" height="12" rx="6" fill="#1e40af" opacity="0.4"/>
+            
+            <!-- Tags -->
+            <g transform="translate(0, 128)">
+                <rect x="0" y="0" width="64" height="24" rx="12" fill="#1e40af" opacity="0.2"/>
+                <rect x="80" y="0" width="48" height="24" rx="12" fill="#1e40af" opacity="0.2"/>
+                <rect x="144" y="0" width="56" height="24" rx="12" fill="#1e40af" opacity="0.2"/>
+            </g>
+        </g>
     </g>
 </svg> 

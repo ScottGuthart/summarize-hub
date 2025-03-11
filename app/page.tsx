@@ -1,20 +1,36 @@
 import { ArticleGrid } from './components/ArticleGrid';
+import {
+  LockClosedIcon,
+  BoltIcon,
+  ComputerDesktopIcon,
+  DocumentTextIcon,
+  ArrowDownTrayIcon,
+  RocketLaunchIcon,
+  ChartBarIcon,
+  CommandLineIcon,
+  ShieldCheckIcon,
+  CpuChipIcon,
+  ArrowUpTrayIcon
+} from '@heroicons/react/24/outline';
 
 export default function Home() {
   return (
     <main className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <div className="bg-gradient-to-b from-purple-700 to-purple-800 text-white py-16">
+      <div className="bg-gradient-to-b from-blue-800 to-blue-900 text-white py-16">
         <div className="container mx-auto px-4">
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
             SummarizeHub
           </h1>
-          <p className="text-xl md:text-2xl text-purple-100 mb-8 max-w-3xl">
-            Privacy-focused article summarization using Gemma 2B-IT. Process your articles in bulk and generate AI summaries & tags directly in your browser.
+          <p className="text-xl md:text-2xl text-blue-100 mb-8 max-w-3xl">
+            Secure, efficient article summarization powered by Google's Gemma 2B-IT. Process articles at scale with our browser-based solution.
           </p>
-          <div className="bg-purple-600/30 rounded-lg p-4 max-w-3xl">
-            <h2 className="text-lg font-semibold mb-2">🔒 Privacy First</h2>
-            <p>All processing happens in your browser - no data is sent to external servers. The AI model runs locally for complete privacy.</p>
+          <div className="bg-blue-700/30 rounded-lg p-6 max-w-3xl border border-blue-600/20">
+            <div className="flex items-center gap-3 mb-3">
+              <ShieldCheckIcon className="w-7 h-7" />
+              <h2 className="text-xl font-semibold">Secure By Design</h2>
+            </div>
+            <p className="text-blue-100">All processing occurs within your browser, ensuring your data remains private and secure. No content is sent to external servers.</p>
           </div>
         </div>
       </div>
@@ -24,69 +40,86 @@ export default function Home() {
         <div className="py-12">
           {/* Instructions Section */}
           <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-6 text-gray-800">How to Use SummarizeHub</h2>
+            <h2 className="text-2xl font-bold mb-6 text-gray-800">Quick Start Guide</h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                <div className="text-2xl mb-2">1️⃣</div>
-                <h3 className="font-semibold mb-2 text-gray-800">Get Template</h3>
-                <p className="text-gray-600">Start by downloading our template file with the required columns.</p>
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="text-2xl mb-3">
+                  <ArrowDownTrayIcon className="w-8 h-8 text-blue-700" />
+                </div>
+                <h3 className="font-semibold mb-2 text-gray-800">Get Started</h3>
+                <p className="text-gray-600">Download our spreadsheet template with the required columns.</p>
               </div>
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                <div className="text-2xl mb-2">2️⃣</div>
-                <h3 className="font-semibold mb-2 text-gray-800">Fill Template</h3>
-                <p className="text-gray-600">Add your articles to the template. The "Article Content" column is required.</p>
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="text-2xl mb-3">
+                  <DocumentTextIcon className="w-8 h-8 text-blue-700" />
+                </div>
+                <h3 className="font-semibold mb-2 text-gray-800">Add Content</h3>
+                <p className="text-gray-600">Fill the template with articles. Required: "Article Content" field.</p>
               </div>
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                <div className="text-2xl mb-2">3️⃣</div>
-                <h3 className="font-semibold mb-2 text-gray-800">Upload File</h3>
-                <p className="text-gray-600">Upload your filled template using the "Choose File" button.</p>
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="text-2xl mb-3">
+                  <ArrowUpTrayIcon className="w-8 h-8 text-blue-700" />
+                </div>
+                <h3 className="font-semibold mb-2 text-gray-800">Upload</h3>
+                <p className="text-gray-600">Import your completed spreadsheet through the secure interface.</p>
               </div>
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                <div className="text-2xl mb-2">4️⃣</div>
-                <h3 className="font-semibold mb-2 text-gray-800">Process Articles</h3>
-                <p className="text-gray-600">Click "Process Articles" to generate AI summaries and tags for all articles.</p>
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="text-2xl mb-3">
+                  <CommandLineIcon className="w-8 h-8 text-blue-700" />
+                </div>
+                <h3 className="font-semibold mb-2 text-gray-800">Process</h3>
+                <p className="text-gray-600">Generate concise summaries and relevant tags using AI analysis.</p>
               </div>
             </div>
           </div>
 
           {/* Important Notes */}
-          <div className="mb-12 bg-yellow-50 border border-yellow-100 rounded-lg p-6">
-            <h2 className="text-xl font-bold mb-4 text-yellow-800">Important Notes</h2>
-            <ul className="space-y-2 text-yellow-800">
+          <div className="mb-12 bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <h2 className="text-xl font-bold mb-4 text-blue-900">Technical Requirements</h2>
+            <ul className="space-y-3 text-blue-900">
               <li className="flex items-start">
-                <span className="mr-2">⚡️</span>
-                <span>First use requires downloading the AI model (~1.2GB). This is a one-time process.</span>
+                <CpuChipIcon className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                <span>First-time setup includes model download (1.2GB). Compatible with standard networks.</span>
               </li>
               <li className="flex items-start">
-                <span className="mr-2">💻</span>
-                <span>Processing happens entirely in your browser. Performance depends on your device.</span>
+                <ComputerDesktopIcon className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                <span>Performance optimized for modern workstations. Recommended: 16GB RAM or higher.</span>
               </li>
               <li className="flex items-start">
-                <span className="mr-2">📝</span>
-                <span>Each article is processed individually. You can track progress in real-time.</span>
+                <DocumentTextIcon className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                <span>Monitor processing progress with detailed status updates.</span>
               </li>
               <li className="flex items-start">
-                <span className="mr-2">💾</span>
-                <span>Export your results anytime in Excel or CSV format.</span>
+                <ArrowDownTrayIcon className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                <span>Export results to standard formats (XLSX, CSV).</span>
               </li>
             </ul>
           </div>
 
           {/* Features Section */}
           <div className="mb-12">
-            <h2 className="text-2xl font-bold mb-6 text-gray-800">Features</h2>
+            <h2 className="text-2xl font-bold mb-6 text-gray-800">Key Features</h2>
             <div className="grid md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                <h3 className="font-semibold mb-2 text-gray-800">🚀 Browser-Based Processing</h3>
-                <p className="text-gray-600">No server required. Everything runs locally in your browser for maximum privacy.</p>
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <ShieldCheckIcon className="w-5 h-5 text-blue-700" />
+                  <h3 className="font-semibold text-gray-800">Data Security</h3>
+                </div>
+                <p className="text-gray-600">Local processing ensures privacy and security of all processed content.</p>
               </div>
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                <h3 className="font-semibold mb-2 text-gray-800">📊 Bulk Processing</h3>
-                <p className="text-gray-600">Process multiple articles at once using CSV or XLSX files.</p>
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <ChartBarIcon className="w-5 h-5 text-blue-700" />
+                  <h3 className="font-semibold text-gray-800">Scalable Processing</h3>
+                </div>
+                <p className="text-gray-600">Handle multiple articles efficiently with support for common file formats.</p>
               </div>
-              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                <h3 className="font-semibold mb-2 text-gray-800">🤖 Advanced AI</h3>
-                <p className="text-gray-600">Powered by Google's Gemma 2B-IT model for high-quality summaries.</p>
+              <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <CpuChipIcon className="w-5 h-5 text-blue-700" />
+                  <h3 className="font-semibold text-gray-800">Advanced Analysis</h3>
+                </div>
+                <p className="text-gray-600">Powered by Google's Gemma 2B-IT model for reliable content summarization.</p>
               </div>
             </div>
           </div>

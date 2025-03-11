@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { ExclamationTriangleIcon, ArrowPathIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface StatusMessageProps {
     message: string;
     isError: boolean;
     persistent?: boolean;
+    showProgress?: boolean;
 }
 
-export function StatusMessage({ message, isError, persistent }: StatusMessageProps) {
+export function StatusMessage({ message, isError, persistent, showProgress = false }: StatusMessageProps) {
     const [isVisible, setIsVisible] = useState(true);
 
     useEffect(() => {
@@ -31,9 +33,11 @@ export function StatusMessage({ message, isError, persistent }: StatusMessagePro
                 role="alert"
             >
                 <div className="flex items-center gap-2 flex-1 mr-2">
-                    <span className="text-xl">
-                        {isError ? '⚠️' : '🔄'}
-                    </span>
+                    {isError ? (
+                        <ExclamationTriangleIcon className="w-5 h-5 text-red-600" />
+                    ) : (
+                        <ArrowPathIcon className={`w-5 h-5 text-blue-600 ${showProgress ? 'animate-spin' : ''}`} />
+                    )}
                     <p className="text-sm font-medium">
                         {message}
                     </p>
@@ -41,10 +45,10 @@ export function StatusMessage({ message, isError, persistent }: StatusMessagePro
                 {!persistent && (
                     <button
                         onClick={() => setIsVisible(false)}
-                        className="flex-shrink-0 text-xl leading-none w-7 h-7 flex items-center justify-center rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-200 transition-all duration-150"
+                        className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full text-gray-500 hover:text-gray-900 hover:bg-gray-200 transition-all duration-150"
                         aria-label="Dismiss"
                     >
-                        ×
+                        <XMarkIcon className="w-5 h-5" />
                     </button>
                 )}
             </div>

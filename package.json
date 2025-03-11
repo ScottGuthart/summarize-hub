@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "@mlc-ai/web-llm": "^0.2.78",
     "canvas-datagrid": "^0.4.7",
     "clsx": "^2.1.1",
