@@ -1,0 +1,17 @@
+{
+  "name": "SummarizeHub",
+  "short_name": "SummarizeHub",
+  "description": "Privacy-focused article summarization tool using Gemma 2B-IT",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1F2937",
+  "theme_color": "#6D28D9",
+  "icons": [
+    {
+      "src": "/assets/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+} 
