@@ -6,14 +6,14 @@ import type { ArticleRow } from '@/lib/types';
 import { StatusMessage } from './StatusMessage';
 import * as XLSX from 'xlsx';
 import { summarizeArticle, cleanup } from '@/lib/summarize';
+import { EXAMPLE_ARTICLES } from '@/lib/example-data';
 import {
     DocumentArrowDownIcon,
     DocumentPlusIcon,
     CommandLineIcon,
     TableCellsIcon,
     DocumentTextIcon,
-    ArrowUpTrayIcon,
-    ChartBarIcon
+    BeakerIcon
 } from '@heroicons/react/24/outline';
 
 // Type declaration for canvas-datagrid
@@ -28,6 +28,19 @@ export function ArticleGrid() {
     const [isSummarizing, setIsSummarizing] = useState(false);
     const [isProcessed, setIsProcessed] = useState(false);
     const [startTime, setStartTime] = useState<number | null>(null);
+    const [isFirstVisit, setIsFirstVisit] = useState(true);
+    const [hasData, setHasData] = useState(false);
+    const [shouldHighlightProcess, setShouldHighlightProcess] = useState(false);
+
+    useEffect(() => {
+        // Check if user has visited before
+        const hasVisited = localStorage.getItem('hasVisitedBefore');
+        if (hasVisited) {
+            setIsFirstVisit(false);
+        } else {
+            localStorage.setItem('hasVisitedBefore', 'true');
+        }
+    }, []);
 
     const formatElapsedTime = (milliseconds: number): string => {
         const seconds = Math.floor(milliseconds / 1000);
@@ -59,16 +72,42 @@ export function ArticleGrid() {
         setStatus({ message, isError, persistent });
     }, []);
 
+    const isTemplateData = useCallback((data: ArticleRow[]) => {
+        return data.length === 1 &&
+            data[0]["Article Content"] === "" &&
+            data[0]["Author Name"] === "";
+    }, []);
+
     const initializeGrid = useCallback(async (data: ArticleRow[]) => {
         if (typeof window === 'undefined') return;
 
         try {
+            // Clean up existing grid if it exists
+            if (gridRef.current?.cleanup) {
+                gridRef.current.cleanup();
+            }
             if (gridRef.current) {
                 gridRef.current.parentNode.removeChild(gridRef.current);
                 gridRef.current = null;
             }
 
-            if (!gridContainerRef.current) return;
+            // Set hasData based on the data we're about to load
+            const shouldShowData = data.length > 0 && !isTemplateData(data);
+            setHasData(shouldShowData);
+            if (shouldShowData) {
+                setShouldHighlightProcess(true);
+            }
+
+            // If we shouldn't show data, return early
+            if (!shouldShowData) return;
+
+            // Wait for next tick to ensure container is mounted
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            if (!gridContainerRef.current) {
+                console.error('Grid container not found');
+                return;
+            }
 
             const canvasDatagrid = (await import('canvas-datagrid')).default;
 
@@ -86,20 +125,37 @@ export function ArticleGrid() {
                     cellPaddingRight: 8,
                     columnHeaderBackgroundColor: '#f8fafc',
                     columnHeaderColor: '#1e3a8a',
-                    cellColor: '#374151', // Default text color
+                    cellColor: '#374151',
                     fontFamily: 'system-ui, -apple-system, sans-serif'
                 }
             });
 
-            gridRef.current.style.height = '500px';
-            gridRef.current.style.width = '100%';
+            // Force a resize and draw after initialization
+            gridRef.current.resize();
+            gridRef.current.draw();
+
+            // Set up resize observer
+            const resizeObserver = new ResizeObserver(() => {
+                if (gridRef.current) {
+                    gridRef.current.resize();
+                    gridRef.current.draw();
+                }
+            });
+
+            resizeObserver.observe(gridContainerRef.current);
+
+            // Store cleanup function
+            gridRef.current.cleanup = () => {
+                resizeObserver.disconnect();
+            };
 
             setIsGridInitialized(true);
         } catch (error) {
             console.error('Error initializing grid:', error);
             showStatus('Error initializing grid component', true);
+            setHasData(false);
         }
-    }, [showStatus]);
+    }, [showStatus, isTemplateData]);
 
     const handleFileSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -113,6 +169,7 @@ export function ArticleGrid() {
         if (file.size > MAX_FILE_SIZE) {
             showStatus(`File size exceeds 10MB limit. Please split your data into smaller batches.`, true);
             event.target.value = '';
+            setHasData(false);
             return;
         }
 
@@ -122,7 +179,8 @@ export function ArticleGrid() {
         const isCSV = file.name.toLowerCase().endsWith('.csv');
 
         try {
-            // Clear the current grid data
+            // Clear the current grid data and hasData state
+            setHasData(false);
             if (gridRef.current) {
                 gridRef.current.data = [];
                 gridRef.current.draw();
@@ -133,7 +191,6 @@ export function ArticleGrid() {
 
             if (isCSV) {
                 const csvText = new TextDecoder().decode(data);
-                console.log('CSV Content:', csvText); // Debug raw CSV content
                 const workbook = XLSX.read(csvText, {
                     type: 'string',
                     raw: false
@@ -150,12 +207,8 @@ export function ArticleGrid() {
                 });
             }
 
-            console.log('Parsed Data:', jsonData); // Debug parsed data
-
             if (jsonData.length === 0) {
                 showStatus('The uploaded file appears to be empty.', true);
-                // Reset to template data if file is empty
-                await initializeGrid(createTemplateData());
                 return;
             }
 
@@ -163,7 +216,6 @@ export function ArticleGrid() {
             const MAX_ROWS = 250;
             if (jsonData.length > MAX_ROWS) {
                 showStatus(`File contains more than ${MAX_ROWS} articles. Please split your data into smaller batches.`, true);
-                await initializeGrid(createTemplateData());
                 return;
             }
 
@@ -175,15 +227,11 @@ export function ArticleGrid() {
 
             if (!hasArticleContent) {
                 showStatus('The "Article Content" column is required. Please use the template.', true);
-                // Reset to template data if validation fails
-                await initializeGrid(createTemplateData());
                 return;
             }
 
             // Normalize data structure regardless of format
-            jsonData = (jsonData as Record<string, any>[]).map((row, index) => {
-                console.log(`Processing row ${index}:`, row);
-
+            jsonData = (jsonData as Record<string, any>[]).map((row) => {
                 // Start with a template object containing all required columns with default values
                 const normalizedRow: Record<string, any> = {
                     "Article Content": "",
@@ -210,25 +258,20 @@ export function ArticleGrid() {
                     }
                 });
 
-                console.log(`Normalized row ${index}:`, normalizedRow);
                 return normalizedRow;
             });
 
-            console.log('Final Data:', jsonData);
-
-            // Initialize grid with the new data
             await initializeGrid(jsonData as ArticleRow[]);
             showStatus('File loaded successfully!', false);
         } catch (error) {
             console.error('Error parsing file:', error);
             showStatus(`Error parsing file: ${error instanceof Error ? error.message : 'Unknown error'}`, true);
-            // Reset to template data on error
-            await initializeGrid(createTemplateData());
+            setHasData(false);
         }
 
         // Reset the file input to allow selecting the same file again
         event.target.value = '';
-    }, [showStatus, initializeGrid, setCurrentFileName, createTemplateData]);
+    }, [showStatus, initializeGrid, setCurrentFileName]);
 
     const downloadTemplate = useCallback(() => {
         const template = createTemplateData();
@@ -256,15 +299,43 @@ export function ArticleGrid() {
         }
     }, [currentFileName, showStatus]);
 
+    const loadExampleData = useCallback(async () => {
+        try {
+            // Clear the current grid data and hasData state
+            setHasData(false);
+            if (gridRef.current) {
+                gridRef.current.data = [];
+                gridRef.current.draw();
+            }
+
+            await initializeGrid(EXAMPLE_ARTICLES);
+            setCurrentFileName('example_articles');
+            setIsProcessed(false);
+            showStatus('Example data loaded successfully!', false);
+
+            // Set hasVisitedBefore in localStorage and update state
+            localStorage.setItem('hasVisitedBefore', 'true');
+            setIsFirstVisit(false);
+        } catch (error) {
+            console.error('Error loading example data:', error);
+            showStatus('Error loading example data. Please try again.', true);
+            setHasData(false);
+        }
+    }, [showStatus, initializeGrid]);
+
     useEffect(() => {
         if (typeof window !== 'undefined' && !isGridInitialized) {
-            initializeGrid(createTemplateData());
+            // Don't initialize with template data on first load
+            setIsGridInitialized(true);
         }
     }, [initializeGrid, createTemplateData, isGridInitialized]);
 
     // Cleanup on unmount
     useEffect(() => {
         return () => {
+            if (gridRef.current?.cleanup) {
+                gridRef.current.cleanup();
+            }
             cleanup();
         };
     }, []);
@@ -304,124 +375,212 @@ export function ArticleGrid() {
                                 <DocumentArrowDownIcon className="w-5 h-5" />
                                 Get Template
                             </button>
+                            <button
+                                onClick={loadExampleData}
+                                className="text-gray-600 hover:text-gray-800 px-3 py-2 rounded-md text-sm font-medium flex items-center gap-2 hover:bg-gray-100 transition-all relative"
+                            >
+                                <BeakerIcon className={`w-5 h-5 [transform-origin:50%_60%] ${isFirstVisit ? 'animate-[swoosh_2s_ease-in-out_infinite]' : ''}`} />
+                                {isFirstVisit && (
+                                    <div className="absolute inset-0 bg-blue-400/20 animate-pulse rounded-md" />
+                                )}
+                                <style jsx global>{`
+                                    @keyframes swoosh {
+                                        0% {
+                                            transform: rotate(0deg);
+                                            filter: drop-shadow(0 0 2px #60a5fa);
+                                        }
+                                        25% {
+                                            transform: rotate(-12deg);
+                                            filter: drop-shadow(0 0 4px #60a5fa);
+                                        }
+                                        75% {
+                                            transform: rotate(12deg);
+                                            filter: drop-shadow(0 0 4px #60a5fa);
+                                        }
+                                        100% {
+                                            transform: rotate(0deg);
+                                            filter: drop-shadow(0 0 2px #60a5fa);
+                                        }
+                                    }
+                                `}</style>
+                                Load Example Data
+                            </button>
                         </div>
 
                         {/* Right side - Processing Actions */}
                         <div className="flex items-center gap-3 ml-auto">
-                            <button
-                                onClick={async () => {
-                                    if (!gridRef.current?.data?.length) {
-                                        showStatus('No articles to summarize', true);
-                                        return;
-                                    }
-
-                                    try {
-                                        setIsSummarizing(true);
-                                        const data = [...gridRef.current.data];
-                                        let errorCount = 0;
-                                        const processingStartTime = Date.now();
-
-                                        for (let i = 0; i < data.length; i++) {
-                                            const row = data[i];
-                                            if (!row['Article Content']) continue;
+                            {hasData && (
+                                <>
+                                    <button
+                                        onClick={async () => {
+                                            setShouldHighlightProcess(false);
+                                            if (!gridRef.current?.data?.length) {
+                                                showStatus('No articles to summarize', true);
+                                                return;
+                                            }
 
                                             try {
-                                                const { summary, tags } = await summarizeArticle(
-                                                    row['Article Content'],
-                                                    {
-                                                        onLoadingUpdate: (status) => {
-                                                            if (status.state === 'loading') {
-                                                                showStatus(`Loading model: ${status.message} (${Math.round(status.progress || 0)}%)`, false, true);
-                                                            } else if (status.state === 'ready') {
-                                                                showStatus('Model ready, starting summarization...', false, true);
-                                                            } else if (status.state === 'error') {
-                                                                showStatus(status.message, true, false);
+                                                setIsSummarizing(true);
+                                                const data = [...gridRef.current.data];
+                                                let errorCount = 0;
+                                                const processingStartTime = Date.now();
+
+                                                for (let i = 0; i < data.length; i++) {
+                                                    const row = data[i];
+                                                    if (!row['Article Content']) continue;
+
+                                                    try {
+                                                        const { summary, tags } = await summarizeArticle(
+                                                            row['Article Content'],
+                                                            {
+                                                                onLoadingUpdate: (status) => {
+                                                                    if (status.state === 'loading') {
+                                                                        // Don't modify the message if it already contains "first time setup"
+                                                                        showStatus(status.message, false, true);
+                                                                    } else if (status.state === 'ready') {
+                                                                        showStatus('Model ready, starting summarization...', false, true);
+                                                                    } else if (status.state === 'error') {
+                                                                        showStatus(status.message, true, false);
+                                                                    }
+                                                                },
+                                                                onSummarizationProgress: (current, total) => {
+                                                                    showStatus(`Summarizing article ${i + 1} of ${data.length}...`, false, true);
+                                                                }
                                                             }
-                                                        },
-                                                        onSummarizationProgress: (current, total) => {
-                                                            showStatus(`Summarizing article ${i + 1} of ${data.length}...`, false, true);
+                                                        );
+
+                                                        data[i] = {
+                                                            ...row,
+                                                            Summary: summary,
+                                                            Tags: tags
+                                                        };
+
+                                                        if (gridRef.current) {
+                                                            gridRef.current.data = data;
+                                                            gridRef.current.draw();
                                                         }
+                                                    } catch (error) {
+                                                        console.error(`Error processing article ${i + 1}:`, error);
+                                                        errorCount++;
+                                                        // Mark the failed article
+                                                        data[i] = {
+                                                            ...row,
+                                                            Summary: "Error: Processing failed",
+                                                            Tags: "Error: Processing failed"
+                                                        };
+                                                        if (gridRef.current) {
+                                                            gridRef.current.data = data;
+                                                            gridRef.current.draw();
+                                                        }
+                                                        // Continue with next article
+                                                        continue;
                                                     }
-                                                );
-
-                                                data[i] = {
-                                                    ...row,
-                                                    Summary: summary,
-                                                    Tags: tags
-                                                };
-
-                                                if (gridRef.current) {
-                                                    gridRef.current.data = data;
-                                                    gridRef.current.draw();
                                                 }
+
+                                                const elapsedTime = Date.now() - processingStartTime;
+                                                const statusMessage = errorCount > 0
+                                                    ? `Processing complete with ${errorCount} error(s). Total time: ${formatElapsedTime(elapsedTime)}`
+                                                    : `Summarization complete! Total processing time: ${formatElapsedTime(elapsedTime)}`;
+                                                showStatus(statusMessage, errorCount > 0, false);
+                                                setIsProcessed(true);
                                             } catch (error) {
-                                                console.error(`Error processing article ${i + 1}:`, error);
-                                                errorCount++;
-                                                // Mark the failed article
-                                                data[i] = {
-                                                    ...row,
-                                                    Summary: "Error: Processing failed",
-                                                    Tags: "Error: Processing failed"
-                                                };
-                                                if (gridRef.current) {
-                                                    gridRef.current.data = data;
-                                                    gridRef.current.draw();
-                                                }
-                                                // Continue with next article
-                                                continue;
+                                                console.error('Error during summarization:', error);
+                                                showStatus('Failed to summarize articles. Please try again.', true, false);
+                                                await cleanup(); // Cleanup on error
+                                            } finally {
+                                                setIsSummarizing(false);
                                             }
-                                        }
+                                        }}
+                                        className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors relative
+                                            ${(isSummarizing || isProcessed)
+                                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                                : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                            }`}
+                                        disabled={isSummarizing || isProcessed}
+                                    >
+                                        {shouldHighlightProcess && !isSummarizing && !isProcessed && (
+                                            <>
+                                                <div className="absolute inset-0 rounded-md animate-[process-glow_2s_ease-in-out_infinite]" />
+                                                <div className="absolute inset-0 rounded-md animate-[process-glow_2s_ease-in-out_infinite] delay-[700ms]" />
+                                            </>
+                                        )}
+                                        <style jsx global>{`
+                                            @keyframes process-glow {
+                                                0% {
+                                                    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7);
+                                                }
+                                                50% {
+                                                    box-shadow: 0 0 8px 6px rgba(37, 99, 235, 0);
+                                                }
+                                                100% {
+                                                    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+                                                }
+                                            }
+                                        `}</style>
+                                        <CommandLineIcon className="w-5 h-5" />
+                                        {isSummarizing ? 'Processing...' : isProcessed ? 'Processing Complete' : 'Process Articles'}
+                                    </button>
 
-                                        const elapsedTime = Date.now() - processingStartTime;
-                                        const statusMessage = errorCount > 0
-                                            ? `Processing complete with ${errorCount} error(s). Total time: ${formatElapsedTime(elapsedTime)}`
-                                            : `Summarization complete! Total processing time: ${formatElapsedTime(elapsedTime)}`;
-                                        showStatus(statusMessage, errorCount > 0, false);
-                                        setIsProcessed(true);
-                                    } catch (error) {
-                                        console.error('Error during summarization:', error);
-                                        showStatus('Failed to summarize articles. Please try again.', true, false);
-                                        await cleanup(); // Cleanup on error
-                                    } finally {
-                                        setIsSummarizing(false);
-                                    }
-                                }}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-blue-600"
-                                disabled={isSummarizing || isProcessed}
-                            >
-                                <CommandLineIcon className="w-5 h-5" />
-                                {isSummarizing ? 'Processing...' : isProcessed ? 'Processing Complete' : 'Process Articles'}
-                            </button>
-
-                            <div className="flex items-center gap-2 border-l border-gray-300 pl-3">
-                                <span className="text-sm text-gray-500">Export as:</span>
-                                <button
-                                    onClick={() => exportFile('xlsx')}
-                                    className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md hover:bg-gray-100 transition-all inline-flex items-center gap-2 text-sm"
-                                    title="Export as Excel Spreadsheet"
-                                >
-                                    <TableCellsIcon className="w-5 h-5" />
-                                    <span className="font-medium">Excel</span>
-                                </button>
-                                <button
-                                    onClick={() => exportFile('csv')}
-                                    className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md hover:bg-gray-100 transition-all inline-flex items-center gap-2 text-sm"
-                                    title="Export as CSV File"
-                                >
-                                    <DocumentTextIcon className="w-5 h-5" />
-                                    <span className="font-medium">CSV</span>
-                                </button>
-                            </div>
+                                    <div className="flex items-center gap-2 border-l border-gray-300 pl-3">
+                                        <span className="text-sm text-gray-500">Export as:</span>
+                                        <button
+                                            onClick={() => exportFile('xlsx')}
+                                            className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md hover:bg-gray-100 transition-all inline-flex items-center gap-2 text-sm"
+                                            title="Export as Excel Spreadsheet"
+                                        >
+                                            <TableCellsIcon className="w-5 h-5" />
+                                            <span className="font-medium">Excel</span>
+                                        </button>
+                                        <button
+                                            onClick={() => exportFile('csv')}
+                                            className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md hover:bg-gray-100 transition-all inline-flex items-center gap-2 text-sm"
+                                            title="Export as CSV File"
+                                        >
+                                            <DocumentTextIcon className="w-5 h-5" />
+                                            <span className="font-medium">CSV</span>
+                                        </button>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* Grid */}
+                {/* Grid or Placeholder */}
                 <div className="p-6">
-                    <div
-                        ref={gridContainerRef}
-                        className="w-full h-[500px] border border-gray-200 rounded-md overflow-hidden"
-                    />
+                    {hasData ? (
+                        <div
+                            ref={gridContainerRef}
+                            className="w-full h-[500px] border border-gray-200 rounded-md overflow-auto"
+                            style={{ position: 'relative' }}
+                        />
+                    ) : (
+                        <div className="w-full h-[500px] border border-gray-200 rounded-md overflow-hidden flex flex-col items-center justify-center text-gray-500">
+                            <DocumentPlusIcon className="w-12 h-12 mb-4" />
+                            <p className="text-lg font-medium mb-2">No Data Loaded</p>
+                            <p className="text-sm flex items-center gap-2">
+                                <label
+                                    htmlFor="fileInput"
+                                    className="text-blue-600 hover:text-blue-800 cursor-pointer transition-colors font-medium"
+                                >
+                                    Upload a file
+                                </label>
+                                <span>or</span>
+                                <button
+                                    onClick={loadExampleData}
+                                    className="text-blue-600 hover:text-blue-800 transition-colors font-medium"
+                                >
+                                    load example data
+                                </button>
+                            </p>
+                            {isFirstVisit && (
+                                <div className="mt-4 flex items-center gap-2 text-blue-600 animate-pulse">
+                                    <BeakerIcon className="w-5 h-5" />
+                                    <span className="text-sm font-medium">Try the example data!</span>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -431,11 +590,45 @@ export function ArticleGrid() {
                     message={status.message}
                     isError={status.isError}
                     persistent={status.persistent}
-                    showProgress={status.message.includes('Loading model') ||
+                    showProgress={status.message.includes('Loading AI model') ||
+                        status.message.includes('first time setup') ||
                         status.message.includes('Summarizing article') ||
                         status.message.includes('Model ready')}
                 />
             )}
+
+            {/* Cache Control Footer */}
+            <div className="mt-8 flex justify-center">
+                <button
+                    onClick={async () => {
+                        try {
+                            // Clear localStorage flag
+                            localStorage.removeItem('modelLoadAttempted');
+
+                            // Clear all caches
+                            const cacheKeys = await caches.keys();
+                            await Promise.all(
+                                cacheKeys.map(key => caches.delete(key))
+                            );
+
+                            // Run cleanup
+                            await cleanup();
+
+                            showStatus('Model cache cleared successfully. The model will need to be downloaded again on next use.', false);
+                        } catch (error) {
+                            console.error('Error clearing cache:', error);
+                            showStatus('Failed to clear model cache', true);
+                        }
+                    }}
+                    disabled={isSummarizing}
+                    className={`text-xs transition-colors py-2 px-3 rounded-md ${isSummarizing
+                        ? 'text-gray-300 cursor-not-allowed'
+                        : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                        }`}
+                >
+                    Clear Model Cache
+                </button>
+            </div>
         </>
     );
 } 
