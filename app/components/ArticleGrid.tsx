@@ -1,3 +1,22 @@
+/**
+ * ArticleGrid Component
+ * 
+ * A complex data grid component that handles article management, processing, and visualization.
+ * Features include:
+ * - File upload/download (XLSX/CSV support)
+ * - Batch article processing
+ * - Real-time progress tracking
+ * - Export functionality
+ * - Example data loading
+ * - Cache management
+ * 
+ * Technical details:
+ * - Uses canvas-datagrid for efficient data rendering
+ * - Supports up to 250 articles per batch
+ * - Maximum file size: 10MB
+ * - Maximum article length: 30,000 characters
+ */
+
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -16,12 +35,15 @@ import {
     BeakerIcon
 } from '@heroicons/react/24/outline';
 
-// Type declaration for canvas-datagrid
-type CanvasDataGrid = any; // Using any for now since the library's types are not properly exported
+// Type declaration for canvas-datagrid (TODO: Add proper types when available)
+type CanvasDataGrid = any;
 
 export function ArticleGrid() {
+    // Refs for managing grid and container elements
     const gridRef = useRef<CanvasDataGrid>(null);
     const gridContainerRef = useRef<HTMLDivElement>(null);
+
+    // State management for UI and processing
     const [status, setStatus] = useState<{ message: string; isError: boolean; persistent?: boolean } | null>(null);
     const [currentFileName, setCurrentFileName] = useState('articles');
     const [isGridInitialized, setIsGridInitialized] = useState(false);
@@ -32,8 +54,10 @@ export function ArticleGrid() {
     const [hasData, setHasData] = useState(false);
     const [shouldHighlightProcess, setShouldHighlightProcess] = useState(false);
 
+    /**
+     * Check if this is the user's first visit and set up local storage
+     */
     useEffect(() => {
-        // Check if user has visited before
         const hasVisited = localStorage.getItem('hasVisitedBefore');
         if (hasVisited) {
             setIsFirstVisit(false);
@@ -42,6 +66,11 @@ export function ArticleGrid() {
         }
     }, []);
 
+    /**
+     * Formats processing time into a human-readable string
+     * @param milliseconds - Time elapsed in milliseconds
+     * @returns Formatted time string (e.g., "2 minutes, 30 seconds")
+     */
     const formatElapsedTime = (milliseconds: number): string => {
         const seconds = Math.floor(milliseconds / 1000);
         const hours = Math.floor(seconds / 3600);
@@ -56,6 +85,10 @@ export function ArticleGrid() {
         return parts.join(', ');
     };
 
+    /**
+     * Creates a template data structure for new article uploads
+     * @returns An array with a single empty article row
+     */
     const createTemplateData = useCallback((): ArticleRow[] => {
         return [{
             "Article Content": "",
@@ -68,16 +101,69 @@ export function ArticleGrid() {
         }];
     }, []);
 
+    /**
+     * Displays status messages to the user
+     * @param message - The message to display
+     * @param isError - Whether this is an error message
+     * @param persistent - Whether the message should persist
+     */
     const showStatus = useCallback((message: string, isError = false, persistent = false) => {
+        // Special handling for WebGPU error
+        if (message.includes('WebGPU is not supported')) {
+            const browserName = navigator.userAgent.includes('Chrome') ? 'Chrome' :
+                navigator.userAgent.includes('Firefox') ? 'Firefox' :
+                    'your browser';
+
+            const chromeInstructions = `
+• Open Chrome settings
+• Search for "WebGPU"
+• Enable "WebGPU" flag
+• Restart Chrome`;
+
+            const firefoxInstructions = `
+• Open Firefox settings
+• Search for "WebGPU"
+• Set "dom.webgpu.enabled" to true
+• Restart Firefox`;
+
+            const instructions = browserName === 'Chrome' ? chromeInstructions :
+                browserName === 'Firefox' ? firefoxInstructions :
+                    'Please use Chrome or Firefox with WebGPU enabled.';
+
+            setStatus({
+                message: `⚠️ WebGPU Support Required
+
+This application requires WebGPU, which is not currently enabled in ${browserName}.
+
+To enable WebGPU:
+${instructions}
+
+Note: WebGPU is a new technology and may not be available in all browsers.`,
+                isError: true,
+                persistent: true
+            });
+            return;
+        }
+
         setStatus({ message, isError, persistent });
     }, []);
 
+    /**
+     * Checks if the current data is just the template
+     * @param data - The data to check
+     * @returns True if the data matches the empty template
+     */
     const isTemplateData = useCallback((data: ArticleRow[]) => {
         return data.length === 1 &&
             data[0]["Article Content"] === "" &&
             data[0]["Author Name"] === "";
     }, []);
 
+    /**
+     * Initializes the canvas-datagrid with the provided data
+     * Handles grid setup, styling, and resize observers
+     * @param data - The data to display in the grid
+     */
     const initializeGrid = useCallback(async (data: ArticleRow[]) => {
         if (typeof window === 'undefined') return;
 
@@ -157,6 +243,13 @@ export function ArticleGrid() {
         }
     }, [showStatus, isTemplateData]);
 
+    /**
+     * Handles file selection and upload
+     * - Validates file size and format
+     * - Processes CSV and XLSX files
+     * - Normalizes data structure
+     * - Initializes grid with uploaded data
+     */
     const handleFileSelect = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) {
@@ -273,6 +366,9 @@ export function ArticleGrid() {
         event.target.value = '';
     }, [showStatus, initializeGrid, setCurrentFileName]);
 
+    /**
+     * Downloads an empty template file for users to fill
+     */
     const downloadTemplate = useCallback(() => {
         const template = createTemplateData();
         const ws = XLSX.utils.json_to_sheet(template);
@@ -281,6 +377,10 @@ export function ArticleGrid() {
         XLSX.writeFile(wb, 'article_template.xlsx');
     }, [createTemplateData]);
 
+    /**
+     * Exports the current grid data to XLSX or CSV format
+     * @param type - The export format ('xlsx' or 'csv')
+     */
     const exportFile = useCallback((type: 'xlsx' | 'csv') => {
         if (!gridRef.current?.data) {
             showStatus('No data to export', true);
@@ -299,6 +399,10 @@ export function ArticleGrid() {
         }
     }, [currentFileName, showStatus]);
 
+    /**
+     * Loads example data for demonstration purposes
+     * Useful for first-time users to understand the system
+     */
     const loadExampleData = useCallback(async () => {
         try {
             // Clear the current grid data and hasData state
@@ -323,6 +427,55 @@ export function ArticleGrid() {
         }
     }, [showStatus, initializeGrid]);
 
+    /**
+     * Checks if WebGPU is available in the current environment
+     * @returns Promise<boolean> indicating if WebGPU is supported
+     */
+    const checkWebGPUSupport = useCallback(async (): Promise<boolean> => {
+        try {
+            if (!navigator.gpu) {
+                throw new Error('WebGPU is not supported');
+            }
+            const adapter = await navigator.gpu.requestAdapter();
+            if (!adapter) {
+                throw new Error('WebGPU adapter not found');
+            }
+            return true;
+        } catch (error) {
+            const browserName = navigator.userAgent.includes('Chrome') ? 'Chrome' :
+                navigator.userAgent.includes('Firefox') ? 'Firefox' :
+                    'your browser';
+
+            const chromeInstructions = `
+1. Copy and paste this into your Chrome address bar: chrome://flags/#enable-unsafe-webgpu
+2. Set "WebGPU" to "Enabled"
+3. Click "Restart" at the bottom of the screen
+4. Return to this page and try again`;
+
+            const firefoxInstructions = `
+1. Copy and paste this into your Firefox address bar: about:config
+2. Search for "dom.webgpu.enabled"
+3. Set it to "true"
+4. Restart Firefox
+5. Return to this page and try again`;
+
+            const instructions = browserName === 'Chrome' ? chromeInstructions :
+                browserName === 'Firefox' ? firefoxInstructions :
+                    'Please use Chrome or Firefox with WebGPU enabled.';
+
+            showStatus(`⚠️ WebGPU Support Required
+
+This application requires WebGPU, which is not currently enabled in ${browserName}.
+
+To enable WebGPU:
+${instructions}
+
+Note: WebGPU is a new technology. For best results, use the latest version of Chrome.`, true, true);
+            return false;
+        }
+    }, [showStatus]);
+
+    // Initialize grid on component mount
     useEffect(() => {
         if (typeof window !== 'undefined' && !isGridInitialized) {
             // Don't initialize with template data on first load
@@ -330,7 +483,7 @@ export function ArticleGrid() {
         }
     }, [initializeGrid, createTemplateData, isGridInitialized]);
 
-    // Cleanup on unmount
+    // Cleanup resources on component unmount
     useEffect(() => {
         return () => {
             if (gridRef.current?.cleanup) {
@@ -416,6 +569,12 @@ export function ArticleGrid() {
                                             setShouldHighlightProcess(false);
                                             if (!gridRef.current?.data?.length) {
                                                 showStatus('No articles to summarize', true);
+                                                return;
+                                            }
+
+                                            // Check WebGPU support before proceeding
+                                            const isWebGPUSupported = await checkWebGPUSupport();
+                                            if (!isWebGPUSupported) {
                                                 return;
                                             }
 
@@ -573,12 +732,6 @@ export function ArticleGrid() {
                                     load example data
                                 </button>
                             </p>
-                            {isFirstVisit && (
-                                <div className="mt-4 flex items-center gap-2 text-blue-600 animate-pulse">
-                                    <BeakerIcon className="w-5 h-5" />
-                                    <span className="text-sm font-medium">Try the example data!</span>
-                                </div>
-                            )}
                         </div>
                     )}
                 </div>

@@ -1,3 +1,13 @@
+/**
+ * Main application page component that provides the user interface for article summarization.
+ * Features a responsive layout with:
+ * - Hero section explaining the service
+ * - Quick start guide
+ * - Technical requirements
+ * - Key features overview
+ * - Article processing interface
+ */
+
 'use client';
 
 import { ArticleGrid } from './components/ArticleGrid';
@@ -13,6 +23,9 @@ import {
   ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
 
+/**
+ * Smooth scroll button component that navigates users to the article manager section
+ */
 function ScrollButton() {
   return (
     <button

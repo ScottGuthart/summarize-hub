@@ -1,21 +1,45 @@
+/**
+ * This module provides article summarization functionality using the Gemma 2B-IT language model.
+ * The summarization process runs entirely in the browser using Web Workers for better performance.
+ */
+
 import { CreateWebWorkerMLCEngine, InitProgressReport, prebuiltAppConfig } from '@mlc-ai/web-llm';
 
+// Global state management for the LLM instance
 let chat: any | null = null;
 let isInitializing = false;
 let worker: Worker | null = null;
 
+/**
+ * Represents the current loading state of the language model
+ * @property state - Current state of the model: 'loading', 'ready', or 'error'
+ * @property message - User-friendly status message
+ * @property progress - Optional loading progress (0-100)
+ */
 export type LoadingStatus = {
     state: 'loading' | 'ready' | 'error';
     message: string;
     progress?: number;
 };
 
+/**
+ * Callback functions for monitoring the summarization process
+ * @property onLoadingUpdate - Called when the model's loading status changes
+ * @property onSummarizationProgress - Called to report progress during summarization
+ */
 export type SummarizationCallbacks = {
     onLoadingUpdate: (status: LoadingStatus) => void;
     onSummarizationProgress: (current: number, total: number) => void;
 };
 
-// Function to chunk text into smaller pieces
+/**
+ * Splits long text into smaller chunks for processing while preserving sentence boundaries.
+ * This prevents the model from exceeding its context window and ensures natural text breaks.
+ * 
+ * @param text - The input text to be chunked
+ * @param maxChunkSize - Maximum size of each chunk (default: 10,000 characters)
+ * @returns Array of text chunks
+ */
 function chunkText(text: string, maxChunkSize: number = 10_000): string[] {
     // If text is short enough, return it as a single chunk
     if (text.length <= maxChunkSize) {
@@ -44,6 +68,16 @@ function chunkText(text: string, maxChunkSize: number = 10_000): string[] {
     return chunks;
 }
 
+/**
+ * Initializes the language model for summarization.
+ * - Handles first-time model downloads (~1.2GB)
+ * - Manages Web Worker lifecycle
+ * - Implements caching for faster subsequent loads
+ * - Provides progress updates during initialization
+ * 
+ * @param onLoadingUpdate - Optional callback for loading status updates
+ * @returns Initialized LLM instance
+ */
 export async function initializeLLM(onLoadingUpdate?: (status: LoadingStatus) => void): Promise<any> {
     if (chat) return chat;
     if (isInitializing) {
@@ -144,6 +178,10 @@ export async function initializeLLM(onLoadingUpdate?: (status: LoadingStatus) =>
     }
 }
 
+/**
+ * Cleans up resources by terminating the Web Worker and resetting state.
+ * Should be called when summarization is complete or on error.
+ */
 export async function cleanup() {
     if (worker) {
         worker.terminate();
@@ -153,6 +191,21 @@ export async function cleanup() {
     isInitializing = false;
 }
 
+/**
+ * Main function for article summarization. Processes articles in chunks if needed,
+ * generates summaries and relevant tags using the language model.
+ * 
+ * Features:
+ * - Handles articles up to 30,000 characters
+ * - Splits long articles into chunks while preserving context
+ * - Combines chunk summaries for coherent final output
+ * - Generates relevant tags based on the content
+ * - Provides progress updates during processing
+ * 
+ * @param content - The article text to summarize
+ * @param callbacks - Optional callbacks for progress monitoring
+ * @returns Object containing the summary and generated tags
+ */
 export async function summarizeArticle(
     content: string,
     callbacks?: SummarizationCallbacks
