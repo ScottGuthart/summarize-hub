@@ -55,9 +55,18 @@ export async function initializeLLM(onLoadingUpdate?: (status: LoadingStatus) =>
 
     try {
         isInitializing = true;
+
+        // Use localStorage as a fallback for tracking first-time loads
+        let isModelCached = localStorage.getItem('modelLoadAttempted') === 'true';
+        console.log('Initial model cache state:', { isModelCached });
+
+        const firstTimeMessage = 'Loading AI model (first time setup - downloading ~1.2GB, this may take a few minutes)';
+        const regularMessage = 'Loading AI model';
+        const currentMessage = isModelCached ? regularMessage : firstTimeMessage;
+
         onLoadingUpdate?.({
             state: 'loading',
-            message: 'Initializing LLM engine...',
+            message: currentMessage,
             progress: 0
         });
 
@@ -76,10 +85,20 @@ export async function initializeLLM(onLoadingUpdate?: (status: LoadingStatus) =>
 
         const progressCallback = (report: InitProgressReport) => {
             const progress = report.progress * 100;
-            console.log(`Loading model: ${report.text} (${progress}%)`);
+            const progressMessage = isModelCached
+                ? `${regularMessage} (${Math.round(progress)}%)`
+                : `${firstTimeMessage} - ${Math.round(progress)}%`;
+
+            console.log('Progress update:', {
+                isModelCached,
+                reportText: report.text,
+                progress,
+                message: progressMessage
+            });
+
             onLoadingUpdate?.({
                 state: 'loading',
-                message: report.text,
+                message: progressMessage,
                 progress
             });
         };
@@ -94,6 +113,10 @@ export async function initializeLLM(onLoadingUpdate?: (status: LoadingStatus) =>
             }
         );
 
+        // Mark that we've attempted to load the model
+        localStorage.setItem('modelLoadAttempted', 'true');
+
+        console.log('Model initialization complete:', { isModelCached });
         onLoadingUpdate?.({
             state: 'ready',
             message: 'Model loaded successfully',
@@ -109,6 +132,8 @@ export async function initializeLLM(onLoadingUpdate?: (status: LoadingStatus) =>
             worker = null;
             chat = null;
         }
+        // Clear the model load flag if there was an error
+        localStorage.removeItem('modelLoadAttempted');
         onLoadingUpdate?.({
             state: 'error',
             message: error instanceof Error ? error.message : 'Failed to initialize LLM',

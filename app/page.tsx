@@ -1,7 +1,10 @@
+'use client';
+
 import { ArticleGrid } from './components/ArticleGrid';
 import {
   ComputerDesktopIcon,
   DocumentTextIcon,
+  ArrowDownIcon,
   ArrowDownTrayIcon,
   ChartBarIcon,
   CommandLineIcon,
@@ -9,6 +12,23 @@ import {
   CpuChipIcon,
   ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
+
+function ScrollButton() {
+  return (
+    <button
+      onClick={() => {
+        document.getElementById('article-manager')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }}
+      className="bg-white text-blue-900 hover:bg-blue-50 px-6 py-3 rounded-lg font-semibold text-lg transition-colors flex items-center gap-2 group"
+    >
+      Get Started
+      <ArrowDownIcon className="w-5 h-5 group-hover:transform group-hover:translate-y-0.5 transition-transform" />
+    </button>
+  );
+}
 
 export default function Home() {
   return (
@@ -28,6 +48,9 @@ export default function Home() {
               <h2 className="text-xl font-semibold">Secure By Design</h2>
             </div>
             <p className="text-blue-100">All processing occurs within your browser, ensuring your data remains private and secure. No content is sent to external servers.</p>
+          </div>
+          <div className="mt-8 flex justify-end">
+            <ScrollButton />
           </div>
         </div>
       </div>
@@ -87,7 +110,7 @@ export default function Home() {
                 <span>Articles per batch: Maximum 250. Article length: Maximum 30,000 characters (~4,000 words or 10 pages). File size: Maximum 10MB.</span>
               </li>
               <li className="flex items-start">
-                <ArrowDownTrayIcon className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
+                <ArrowDownIcon className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
                 <span>Export results to standard formats (XLSX, CSV).</span>
               </li>
             </ul>
@@ -130,7 +153,7 @@ export default function Home() {
         </div>
 
         {/* Article Manager */}
-        <div className="py-8">
+        <div id="article-manager" className="py-8">
           <ArticleGrid />
         </div>
       </div>
