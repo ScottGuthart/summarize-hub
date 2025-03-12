@@ -5,7 +5,7 @@ import { TEMPLATE_COLUMNS, NUMERIC_COLUMNS } from '@/lib/constants';
 import type { ArticleRow } from '@/lib/types';
 import { StatusMessage } from './StatusMessage';
 import * as XLSX from 'xlsx';
-import { summarizeArticle } from '@/lib/summarize';
+import { summarizeArticle, cleanup } from '@/lib/summarize';
 import {
     DocumentArrowDownIcon,
     DocumentPlusIcon,
@@ -27,6 +27,21 @@ export function ArticleGrid() {
     const [isGridInitialized, setIsGridInitialized] = useState(false);
     const [isSummarizing, setIsSummarizing] = useState(false);
     const [isProcessed, setIsProcessed] = useState(false);
+    const [startTime, setStartTime] = useState<number | null>(null);
+
+    const formatElapsedTime = (milliseconds: number): string => {
+        const seconds = Math.floor(milliseconds / 1000);
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const remainingSeconds = seconds % 60;
+
+        const parts = [];
+        if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`);
+        if (minutes > 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`);
+        if (remainingSeconds > 0 || parts.length === 0) parts.push(`${remainingSeconds} second${remainingSeconds !== 1 ? 's' : ''}`);
+
+        return parts.join(', ');
+    };
 
     const createTemplateData = useCallback((): ArticleRow[] => {
         return [{
@@ -93,6 +108,14 @@ export function ArticleGrid() {
             return;
         }
 
+        // File size validation (10MB limit)
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
+        if (file.size > MAX_FILE_SIZE) {
+            showStatus(`File size exceeds 10MB limit. Please split your data into smaller batches.`, true);
+            event.target.value = '';
+            return;
+        }
+
         setStatus(null); // Clear any existing status messages
         setIsProcessed(false); // Reset processed state when new file is uploaded
         setCurrentFileName(file.name.split('.')[0]);
@@ -136,7 +159,15 @@ export function ArticleGrid() {
                 return;
             }
 
-            // Check for Article Content column
+            // Row count validation (250 articles limit)
+            const MAX_ROWS = 250;
+            if (jsonData.length > MAX_ROWS) {
+                showStatus(`File contains more than ${MAX_ROWS} articles. Please split your data into smaller batches.`, true);
+                await initializeGrid(createTemplateData());
+                return;
+            }
+
+            // Check for Article Content column and validate content length
             const firstRow = jsonData[0] as Record<string, any>;
             const hasArticleContent = Object.keys(firstRow).some(key =>
                 key.trim().toLowerCase() === 'article content'.toLowerCase()
@@ -231,6 +262,13 @@ export function ArticleGrid() {
         }
     }, [initializeGrid, createTemplateData, isGridInitialized]);
 
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            cleanup();
+        };
+    }, []);
+
     return (
         <>
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -280,46 +318,70 @@ export function ArticleGrid() {
                                     try {
                                         setIsSummarizing(true);
                                         const data = [...gridRef.current.data];
+                                        let errorCount = 0;
+                                        const processingStartTime = Date.now();
 
                                         for (let i = 0; i < data.length; i++) {
                                             const row = data[i];
                                             if (!row['Article Content']) continue;
 
-                                            const { summary, tags } = await summarizeArticle(
-                                                row['Article Content'],
-                                                {
-                                                    onLoadingUpdate: (status) => {
-                                                        if (status.state === 'loading') {
-                                                            showStatus(`Loading model: ${status.message} (${Math.round(status.progress || 0)}%)`, false, true);
-                                                        } else if (status.state === 'ready') {
-                                                            showStatus('Model ready, starting summarization...', false, true);
-                                                        } else if (status.state === 'error') {
-                                                            showStatus(status.message, true, false);
+                                            try {
+                                                const { summary, tags } = await summarizeArticle(
+                                                    row['Article Content'],
+                                                    {
+                                                        onLoadingUpdate: (status) => {
+                                                            if (status.state === 'loading') {
+                                                                showStatus(`Loading model: ${status.message} (${Math.round(status.progress || 0)}%)`, false, true);
+                                                            } else if (status.state === 'ready') {
+                                                                showStatus('Model ready, starting summarization...', false, true);
+                                                            } else if (status.state === 'error') {
+                                                                showStatus(status.message, true, false);
+                                                            }
+                                                        },
+                                                        onSummarizationProgress: (current, total) => {
+                                                            showStatus(`Summarizing article ${i + 1} of ${data.length}...`, false, true);
                                                         }
-                                                    },
-                                                    onSummarizationProgress: (current, total) => {
-                                                        showStatus(`Summarizing article ${i + 1} of ${data.length}...`, false, true);
                                                     }
+                                                );
+
+                                                data[i] = {
+                                                    ...row,
+                                                    Summary: summary,
+                                                    Tags: tags
+                                                };
+
+                                                if (gridRef.current) {
+                                                    gridRef.current.data = data;
+                                                    gridRef.current.draw();
                                                 }
-                                            );
-
-                                            data[i] = {
-                                                ...row,
-                                                Summary: summary,
-                                                Tags: tags
-                                            };
-
-                                            if (gridRef.current) {
-                                                gridRef.current.data = data;
-                                                gridRef.current.draw();
+                                            } catch (error) {
+                                                console.error(`Error processing article ${i + 1}:`, error);
+                                                errorCount++;
+                                                // Mark the failed article
+                                                data[i] = {
+                                                    ...row,
+                                                    Summary: "Error: Processing failed",
+                                                    Tags: "Error: Processing failed"
+                                                };
+                                                if (gridRef.current) {
+                                                    gridRef.current.data = data;
+                                                    gridRef.current.draw();
+                                                }
+                                                // Continue with next article
+                                                continue;
                                             }
                                         }
 
-                                        showStatus('Summarization complete!', false, false);
-                                        setIsProcessed(true); // Set processed state to true after successful processing
+                                        const elapsedTime = Date.now() - processingStartTime;
+                                        const statusMessage = errorCount > 0
+                                            ? `Processing complete with ${errorCount} error(s). Total time: ${formatElapsedTime(elapsedTime)}`
+                                            : `Summarization complete! Total processing time: ${formatElapsedTime(elapsedTime)}`;
+                                        showStatus(statusMessage, errorCount > 0, false);
+                                        setIsProcessed(true);
                                     } catch (error) {
                                         console.error('Error during summarization:', error);
                                         showStatus('Failed to summarize articles. Please try again.', true, false);
+                                        await cleanup(); // Cleanup on error
                                     } finally {
                                         setIsSummarizing(false);
                                     }

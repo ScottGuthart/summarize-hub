@@ -1,16 +1,13 @@
 import { ArticleGrid } from './components/ArticleGrid';
 import {
-  LockClosedIcon,
-  BoltIcon,
   ComputerDesktopIcon,
   DocumentTextIcon,
   ArrowDownTrayIcon,
-  RocketLaunchIcon,
   ChartBarIcon,
   CommandLineIcon,
   ShieldCheckIcon,
   CpuChipIcon,
-  ArrowUpTrayIcon
+  ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
 
 export default function Home() {
@@ -54,7 +51,7 @@ export default function Home() {
                   <DocumentTextIcon className="w-8 h-8 text-blue-700" />
                 </div>
                 <h3 className="font-semibold mb-2 text-gray-800">Add Content</h3>
-                <p className="text-gray-600">Fill the template with articles. Required: "Article Content" field.</p>
+                <p className="text-gray-600">Fill the template with articles (max 30,000 characters each). Required: "Article Content" field.</p>
               </div>
               <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
                 <div className="text-2xl mb-3">
@@ -87,7 +84,7 @@ export default function Home() {
               </li>
               <li className="flex items-start">
                 <DocumentTextIcon className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />
-                <span>Monitor processing progress with detailed status updates.</span>
+                <span>Articles per batch: Maximum 250. Article length: Maximum 30,000 characters (~4,000 words or 10 pages). File size: Maximum 10MB.</span>
               </li>
               <li className="flex items-start">
                 <ArrowDownTrayIcon className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" />

@@ -53,7 +53,7 @@ Key benefits of this approach:
 ## Usage
 
 1. Click "Download Template" to get the article template
-2. Fill in your articles in the template
+2. Fill in your articles in the template (maximum 250 articles per batch)
 3. Click "Load File" to upload your filled template
 4. Click "Process Articles" to process all articles
 5. Export the results using "Export XLSX" or "Export CSV"
@@ -66,9 +66,24 @@ Key benefits of this approach:
   - Processing speed depends on client hardware
   - Browser storage limits may affect model caching
 
+- **Article Processing**:
+  - Maximum article length is 30,000 characters (~4,000 words or 10 single-spaced pages)
+  - Articles are automatically chunked for efficient processing
+  - Long articles are split into smaller segments at sentence boundaries
+  - Each segment is summarized independently and then combined
+  - Processing time increases with article length
+  - Articles exceeding the length limit will be marked with an error
+
+- **Batch Processing**:
+  - Maximum 250 articles per batch for optimal performance
+  - 10MB file size limit
+  - Larger datasets should be split into multiple batches
+  - Processing time varies based on article length and complexity
+
 - **Model Size**: 
   - Initial model download is ~1.2GB
   - Requires stable internet connection for first use
+  - Model is cached in browser for subsequent use
 
 ## Planned Upgrades
 
