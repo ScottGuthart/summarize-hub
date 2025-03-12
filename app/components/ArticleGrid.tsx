@@ -19,6 +19,15 @@
 
 'use client';
 
+// Add WebGPU types to Navigator
+declare global {
+    interface Navigator {
+        gpu?: {
+            requestAdapter(): Promise<any>;
+        };
+    }
+}
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TEMPLATE_COLUMNS, NUMERIC_COLUMNS } from '@/lib/constants';
 import type { ArticleRow } from '@/lib/types';
