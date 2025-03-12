@@ -58,10 +58,31 @@ export function ArticleGrid() {
     const [isGridInitialized, setIsGridInitialized] = useState(false);
     const [isSummarizing, setIsSummarizing] = useState(false);
     const [isProcessed, setIsProcessed] = useState(false);
-    const [startTime, setStartTime] = useState<number | null>(null);
     const [isFirstVisit, setIsFirstVisit] = useState(true);
     const [hasData, setHasData] = useState(false);
     const [shouldHighlightProcess, setShouldHighlightProcess] = useState(false);
+    const [isWebGPUSupported, setIsWebGPUSupported] = useState<boolean | null>(null);
+
+    /**
+     * Check WebGPU support on component mount
+     */
+    useEffect(() => {
+        const checkWebGPU = async () => {
+            try {
+                if (!navigator.gpu) {
+                    throw new Error('WebGPU is not supported');
+                }
+                const adapter = await navigator.gpu.requestAdapter();
+                if (!adapter) {
+                    throw new Error('WebGPU adapter not found');
+                }
+                setIsWebGPUSupported(true);
+            } catch (error) {
+                setIsWebGPUSupported(false);
+            }
+        };
+        checkWebGPU();
+    }, []);
 
     /**
      * Check if this is the user's first visit and set up local storage
@@ -117,43 +138,6 @@ export function ArticleGrid() {
      * @param persistent - Whether the message should persist
      */
     const showStatus = useCallback((message: string, isError = false, persistent = false) => {
-        // Special handling for WebGPU error
-        if (message.includes('WebGPU is not supported')) {
-            const browserName = navigator.userAgent.includes('Chrome') ? 'Chrome' :
-                navigator.userAgent.includes('Firefox') ? 'Firefox' :
-                    'your browser';
-
-            const chromeInstructions = `
-• Open Chrome settings
-• Search for "WebGPU"
-• Enable "WebGPU" flag
-• Restart Chrome`;
-
-            const firefoxInstructions = `
-• Open Firefox settings
-• Search for "WebGPU"
-• Set "dom.webgpu.enabled" to true
-• Restart Firefox`;
-
-            const instructions = browserName === 'Chrome' ? chromeInstructions :
-                browserName === 'Firefox' ? firefoxInstructions :
-                    'Please use Chrome or Firefox with WebGPU enabled.';
-
-            setStatus({
-                message: `⚠️ WebGPU Support Required
-
-This application requires WebGPU, which is not currently enabled in ${browserName}.
-
-To enable WebGPU:
-${instructions}
-
-Note: WebGPU is a new technology and may not be available in all browsers.`,
-                isError: true,
-                persistent: true
-            });
-            return;
-        }
-
         setStatus({ message, isError, persistent });
     }, []);
 
@@ -451,38 +435,97 @@ Note: WebGPU is a new technology and may not be available in all browsers.`,
             }
             return true;
         } catch (error) {
-            const browserName = navigator.userAgent.includes('Chrome') ? 'Chrome' :
-                navigator.userAgent.includes('Firefox') ? 'Firefox' :
-                    'your browser';
-
-            const chromeInstructions = `
-1. Copy and paste this into your Chrome address bar: chrome://flags/#enable-unsafe-webgpu
-2. Set "WebGPU" to "Enabled"
-3. Click "Restart" at the bottom of the screen
-4. Return to this page and try again`;
-
-            const firefoxInstructions = `
-1. Copy and paste this into your Firefox address bar: about:config
-2. Search for "dom.webgpu.enabled"
-3. Set it to "true"
-4. Restart Firefox
-5. Return to this page and try again`;
-
-            const instructions = browserName === 'Chrome' ? chromeInstructions :
-                browserName === 'Firefox' ? firefoxInstructions :
-                    'Please use Chrome or Firefox with WebGPU enabled.';
-
             showStatus(`⚠️ WebGPU Support Required
 
-This application requires WebGPU, which is not currently enabled in ${browserName}.
-
-To enable WebGPU:
-${instructions}
-
-Note: WebGPU is a new technology. For best results, use the latest version of Chrome.`, true, true);
+This application requires WebGPU. Please use the latest version of Chrome.`, true, true);
             return false;
         }
     }, [showStatus]);
+
+    /**
+     * Processes all articles in the grid and generates summaries and tags
+     * @returns Object containing success status and any error information
+     */
+    const processArticles = useCallback(async () => {
+        if (!gridRef.current?.data?.length) {
+            showStatus('No articles to summarize', true);
+            return { success: false };
+        }
+
+        // Check WebGPU support before proceeding
+        const isWebGPUSupported = await checkWebGPUSupport();
+        if (!isWebGPUSupported) {
+            return { success: false };
+        }
+
+        try {
+            const data = [...gridRef.current.data];
+            let errorCount = 0;
+            const processingStartTime = Date.now();
+
+            for (let i = 0; i < data.length; i++) {
+                const row = data[i];
+                if (!row['Article Content']) continue;
+
+                try {
+                    const { summary, tags } = await summarizeArticle(
+                        row['Article Content'],
+                        {
+                            onLoadingUpdate: (status) => {
+                                if (status.state === 'loading') {
+                                    showStatus(status.message, false, true);
+                                } else if (status.state === 'ready') {
+                                    showStatus('Model ready, starting summarization...', false, true);
+                                } else if (status.state === 'error') {
+                                    showStatus(status.message, true, false);
+                                }
+                            },
+                            onSummarizationProgress: (current, total) => {
+                                showStatus(`Summarizing article ${i + 1} of ${data.length}...`, false, true);
+                            }
+                        }
+                    );
+
+                    data[i] = {
+                        ...row,
+                        Summary: summary,
+                        Tags: tags
+                    };
+
+                    if (gridRef.current) {
+                        gridRef.current.data = data;
+                        gridRef.current.draw();
+                    }
+                } catch (error) {
+                    console.error(`Error processing article ${i + 1}:`, error);
+                    errorCount++;
+                    data[i] = {
+                        ...row,
+                        Summary: "Error: Processing failed",
+                        Tags: "Error: Processing failed"
+                    };
+                    if (gridRef.current) {
+                        gridRef.current.data = data;
+                        gridRef.current.draw();
+                    }
+                    continue;
+                }
+            }
+
+            const elapsedTime = Date.now() - processingStartTime;
+            const statusMessage = errorCount > 0
+                ? `Processing complete with ${errorCount} error(s). Total time: ${formatElapsedTime(elapsedTime)}`
+                : `Summarization complete! Total processing time: ${formatElapsedTime(elapsedTime)}`;
+            showStatus(statusMessage, errorCount > 0, false);
+
+            return { success: true, errorCount };
+        } catch (error) {
+            console.error('Error during summarization:', error);
+            showStatus('Failed to summarize articles. Please try again.', true, false);
+            await cleanup(); // Cleanup on error
+            return { success: false, error };
+        }
+    }, [checkWebGPUSupport, showStatus, formatElapsedTime]);
 
     // Initialize grid on component mount
     useEffect(() => {
@@ -501,6 +544,40 @@ Note: WebGPU is a new technology. For best results, use the latest version of Ch
             cleanup();
         };
     }, []);
+
+    // If WebGPU is not supported, show warning message
+    if (isWebGPUSupported === false) {
+        return (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+                <div className="max-w-2xl mx-auto text-center">
+                    <div className="text-amber-500 mb-4">⚠️</div>
+                    <h2 className="text-xl font-semibold text-gray-800 mb-4">WebGPU Support Required</h2>
+                    <p className="text-gray-600 mb-6">
+                        This application requires WebGPU, which is only available in the latest version of Chrome.
+                    </p>
+                    <a
+                        href="https://www.google.com/chrome/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                        Download Chrome
+                    </a>
+                </div>
+            </div>
+        );
+    }
+
+    // Don't render the main component until we've checked WebGPU support
+    if (isWebGPUSupported === null) {
+        return (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+                <div className="flex justify-center items-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <>
@@ -576,85 +653,12 @@ Note: WebGPU is a new technology. For best results, use the latest version of Ch
                                     <button
                                         onClick={async () => {
                                             setShouldHighlightProcess(false);
-                                            if (!gridRef.current?.data?.length) {
-                                                showStatus('No articles to summarize', true);
-                                                return;
-                                            }
-
-                                            // Check WebGPU support before proceeding
-                                            const isWebGPUSupported = await checkWebGPUSupport();
-                                            if (!isWebGPUSupported) {
-                                                return;
-                                            }
-
+                                            setIsSummarizing(true);
                                             try {
-                                                setIsSummarizing(true);
-                                                const data = [...gridRef.current.data];
-                                                let errorCount = 0;
-                                                const processingStartTime = Date.now();
-
-                                                for (let i = 0; i < data.length; i++) {
-                                                    const row = data[i];
-                                                    if (!row['Article Content']) continue;
-
-                                                    try {
-                                                        const { summary, tags } = await summarizeArticle(
-                                                            row['Article Content'],
-                                                            {
-                                                                onLoadingUpdate: (status) => {
-                                                                    if (status.state === 'loading') {
-                                                                        // Don't modify the message if it already contains "first time setup"
-                                                                        showStatus(status.message, false, true);
-                                                                    } else if (status.state === 'ready') {
-                                                                        showStatus('Model ready, starting summarization...', false, true);
-                                                                    } else if (status.state === 'error') {
-                                                                        showStatus(status.message, true, false);
-                                                                    }
-                                                                },
-                                                                onSummarizationProgress: (current, total) => {
-                                                                    showStatus(`Summarizing article ${i + 1} of ${data.length}...`, false, true);
-                                                                }
-                                                            }
-                                                        );
-
-                                                        data[i] = {
-                                                            ...row,
-                                                            Summary: summary,
-                                                            Tags: tags
-                                                        };
-
-                                                        if (gridRef.current) {
-                                                            gridRef.current.data = data;
-                                                            gridRef.current.draw();
-                                                        }
-                                                    } catch (error) {
-                                                        console.error(`Error processing article ${i + 1}:`, error);
-                                                        errorCount++;
-                                                        // Mark the failed article
-                                                        data[i] = {
-                                                            ...row,
-                                                            Summary: "Error: Processing failed",
-                                                            Tags: "Error: Processing failed"
-                                                        };
-                                                        if (gridRef.current) {
-                                                            gridRef.current.data = data;
-                                                            gridRef.current.draw();
-                                                        }
-                                                        // Continue with next article
-                                                        continue;
-                                                    }
+                                                const result = await processArticles();
+                                                if (result.success) {
+                                                    setIsProcessed(true);
                                                 }
-
-                                                const elapsedTime = Date.now() - processingStartTime;
-                                                const statusMessage = errorCount > 0
-                                                    ? `Processing complete with ${errorCount} error(s). Total time: ${formatElapsedTime(elapsedTime)}`
-                                                    : `Summarization complete! Total processing time: ${formatElapsedTime(elapsedTime)}`;
-                                                showStatus(statusMessage, errorCount > 0, false);
-                                                setIsProcessed(true);
-                                            } catch (error) {
-                                                console.error('Error during summarization:', error);
-                                                showStatus('Failed to summarize articles. Please try again.', true, false);
-                                                await cleanup(); // Cleanup on error
                                             } finally {
                                                 setIsSummarizing(false);
                                             }
