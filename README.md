@@ -18,7 +18,7 @@ Note: the app is currently deployed at https://summarize-hub.vercel.app/
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/seguthart/summarize-hub.git
+git clone https://github.com/scottguthart/summarize-hub.git
 cd summarize-hub
 ```
 
@@ -142,11 +142,3 @@ Key benefits of this approach:
   - Offline support
   - Background processing
   - Push notifications
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
